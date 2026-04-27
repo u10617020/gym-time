@@ -53,11 +53,13 @@
             margin-bottom: 10px;
         }
 
-        #top-clock {
-            font-family: monospace;
-            font-size: 0.9rem;
-            color: var(--secondary);
+        .home-icon {
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: var(--text-dim);
+            transition: 0.2s;
         }
+        .home-icon:hover { color: var(--primary); }
 
         .screen { 
             display: none; 
@@ -121,6 +123,12 @@
             box-shadow: 0 4px 15px rgba(255, 62, 62, 0.4);
             text-transform: uppercase;
             font-weight: 900;
+        }
+
+        .btn-danger {
+            background: #3a0000;
+            color: var(--danger);
+            border: 1px solid var(--danger);
         }
 
         /* 滾動區域 */
@@ -187,13 +195,33 @@
             text-transform: uppercase;
         }
 
-        .search-container {
-            margin-bottom: 15px;
+        .dev-link {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #333;
+            margin-top: 10px;
+            cursor: pointer;
+            text-decoration: underline;
         }
-        .search-input {
-            padding: 10px;
-            font-size: 0.9rem;
-            margin-bottom: 0;
+
+        /* 彈窗樣式 */
+        .modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-content {
+            background: #1a1a1a;
+            border: 2px solid var(--primary);
+            border-radius: 20px;
+            padding: 20px;
+            width: 100%;
+            text-align: center;
         }
     </style>
 </head>
@@ -202,7 +230,9 @@
     <div id="app-container">
         <header>
             <div style="font-weight: 900; font-style: italic;">健身 <span style="color:var(--primary)">KO</span> 榜單</div>
-            <div id="top-clock">00:00:00</div>
+            <div id="nav-icons">
+                <span class="home-icon" onclick="confirmGoHome()">🏠</span>
+            </div>
         </header>
 
         <!-- 0. 啟動頁 -->
@@ -237,6 +267,7 @@
             </div>
             <button class="btn-primary" onclick="showScreen('name-input')">開始新的挑戰</button>
             <button onclick="viewAllHistory()">查看所有戰績</button>
+            <div class="dev-link" onclick="openDevAuth()">進入開發者模式</div>
         </div>
 
         <!-- 名稱輸入頁 -->
@@ -279,9 +310,9 @@
                 <div class="control-card">
                     <div style="color:var(--text-dim); font-size:0.8rem;">挑戰重量 (KG)</div>
                     <div class="stepper-row">
-                        <button class="step-btn" onclick="changeVal('weight', -2.5)">−</button>
-                        <div class="step-label" id="val-weight">20</div>
-                        <button class="step-btn" onclick="changeVal('weight', 2.5)">+</button>
+                        <button class="step-btn" onclick="changeVal('weight', -2)">−</button>
+                        <div class="step-label"><span id="val-weight">20</span></div>
+                        <button class="step-btn" onclick="changeVal('weight', 2)">+</button>
                     </div>
                 </div>
                 <div class="control-card">
@@ -347,7 +378,35 @@
             </div>
             <div class="scroll-box" id="all-history-list"></div>
             <button style="background:none; border:none; color:#666;" onclick="showMain()">← 返回主頁</button>
-            <button onclick="clearHistory()" style="color: var(--danger); font-size: 0.7rem; border:none; background:none;">清除本地數據</button>
+        </div>
+
+        <!-- 8. 開發者模式 -->
+        <div id="step-dev" class="screen">
+            <h2 style="color:var(--danger)">開發者後台</h2>
+            <div class="scroll-box">
+                <p style="color:var(--text-dim); font-size:0.8rem;">危險區域：操作將影響排行榜數據</p>
+                <div class="control-card">
+                    <div style="margin-bottom:10px;">清除單項榜單首位</div>
+                    <button class="btn-danger" style="padding:10px; font-size:0.8rem;" onclick="clearRank('weight')">清除最高重量</button>
+                    <button class="btn-danger" style="padding:10px; font-size:0.8rem;" onclick="clearRank('sets')">清除最多組數</button>
+                    <button class="btn-danger" style="padding:10px; font-size:0.8rem;" onclick="clearRank('reps')">清除最高次數</button>
+                </div>
+                <div class="control-card">
+                    <div style="margin-bottom:10px;">全面格式化</div>
+                    <button class="btn-danger" style="background:var(--danger); color:white;" onclick="clearAllData()">刪除所有歷史戰績</button>
+                </div>
+            </div>
+            <button onclick="showMain()">離開後台</button>
+        </div>
+
+        <!-- 密碼彈窗 -->
+        <div id="auth-modal" class="modal">
+            <div class="modal-content">
+                <h3>權限認證</h3>
+                <input type="password" id="dev-pass" placeholder="輸入密碼">
+                <button class="btn-primary" onclick="verifyDev()">進入</button>
+                <button onclick="closeModal()">取消</button>
+            </div>
         </div>
     </div>
 
@@ -359,15 +418,24 @@
             timer: null
         };
 
-        function updateTime() {
-            document.getElementById('top-clock').innerText = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+        // 導航保護
+        function confirmGoHome() {
+            const activeScreen = document.querySelector('.screen.active').id;
+            if (['step-3', 'step-4', 'step-2'].includes(activeScreen)) {
+                if (confirm("訓練尚未儲存，確定要放棄目前挑戰並回到首頁嗎？")) {
+                    showMain();
+                }
+            } else {
+                showMain();
+            }
         }
-        setInterval(updateTime, 1000);
-        updateTime();
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById('step-' + id).classList.add('active');
+            
+            // 只有在首頁才隱藏 Home 圖標
+            document.querySelector('.home-icon').style.display = (id === '0' || id === '0-1') ? 'none' : 'block';
         }
 
         function showMain() {
@@ -396,7 +464,10 @@
         }
 
         function changeVal(key, delta) {
-            if (key === 'rest') {
+            if (key === 'weight') {
+                session.curr.weight = Math.max(2, session.curr.weight + delta);
+                document.getElementById('val-weight').innerText = session.curr.weight;
+            } else if (key === 'rest') {
                 session.curr.rest = Math.max(0, session.curr.rest + delta);
                 document.getElementById('val-rest').innerText = session.curr.rest;
             } else if (key === 'targetSets') {
@@ -405,9 +476,6 @@
             } else if (key === 'reps') {
                 session.curr.reps = Math.max(1, session.curr.reps + delta);
                 document.getElementById('val-reps').innerText = session.curr.reps;
-            } else if (key === 'weight') {
-                session.curr.weight = Math.max(0, session.curr.weight + delta);
-                document.getElementById('val-weight').innerText = session.curr.weight;
             }
         }
 
@@ -420,7 +488,6 @@
         function handleFinishSet() {
             session.curr.actualCount++;
             if (session.curr.actualCount >= session.curr.target) {
-                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                 finishExercise();
             } else {
                 document.getElementById('val-sets').innerText = session.curr.actualCount + 1;
@@ -451,6 +518,7 @@
                 reps: session.curr.reps,
                 sets: session.curr.actualCount,
                 rest: session.curr.rest,
+                id: Date.now() + Math.random(),
                 time: new Date().toLocaleString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
             });
             renderHistoryList();
@@ -462,7 +530,7 @@
             list.innerHTML = session.history.map(item => `
                 <div class="history-card">
                     <div style="font-weight:bold">${item.name}</div>
-                    <div style="font-size:0.8rem; color:var(--text-dim)">${item.weight}KG x ${item.reps}下 x ${item.sets}組 (休${item.rest}s)</div>
+                    <div style="font-size:0.8rem; color:var(--text-dim)">${item.weight}KG x ${item.reps}下 x ${item.sets}組</div>
                 </div>
             `).join('');
         }
@@ -479,13 +547,10 @@
             const search = document.getElementById('search-name').value.toLowerCase();
             const list = document.getElementById('all-history-list');
             const allRecords = JSON.parse(localStorage.getItem('gym_ko_records') || '[]');
-            
             const filtered = allRecords.filter(r => r.player.toLowerCase().includes(search));
             
-            if(filtered.length === 0) {
-                list.innerHTML = '<div style="text-align:center; padding:40px; color:#444;">無匹配紀錄</div>';
-            } else {
-                list.innerHTML = filtered.map(item => `
+            list.innerHTML = filtered.length === 0 ? '<div style="text-align:center; padding:40px; color:#444;">無匹配紀錄</div>' :
+                filtered.map(item => `
                     <div class="history-card">
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                             <span><span class="player-tag">${item.player}</span> <b>${item.name}</b></span>
@@ -494,13 +559,15 @@
                         <div style="font-size:0.8rem; color:var(--text-dim)">${item.weight}KG x ${item.reps}下 x ${item.sets}組</div>
                     </div>
                 `).join('');
-            }
             showScreen(7);
         }
 
         function updateLeaderboard() {
             const allRecords = JSON.parse(localStorage.getItem('gym_ko_records') || '[]');
-            if(allRecords.length === 0) return;
+            if(allRecords.length === 0) {
+                ['rank-weight', 'rank-sets', 'rank-reps', 'rank-rest'].forEach(id => document.getElementById(id).innerText = '-');
+                return;
+            }
 
             let maxW = { val: 0, p: '-' }, maxS = { val: 0, p: '-' }, maxR = { val: 0, p: '-' }, minRest = { val: 999, p: '-' };
 
@@ -518,14 +585,53 @@
             document.getElementById('rank-rest').innerText = minRest.val === 999 ? '-' : `${minRest.p} (${minRest.val}s)`;
         }
 
-        function clearHistory() {
-            if(confirm("確定清除榜單？這將抹除所有英雄紀錄！")) {
-                localStorage.removeItem('gym_ko_records');
-                viewAllHistory();
+        // 開發者功能
+        function openDevAuth() {
+            document.getElementById('dev-pass').value = '';
+            document.getElementById('auth-modal').style.display = 'flex';
+        }
+        function closeModal() { document.getElementById('auth-modal').style.display = 'none'; }
+        function verifyDev() {
+            if(document.getElementById('dev-pass').value === '1222') {
+                closeModal();
+                showScreen('dev');
+            } else {
+                alert("密碼錯誤！");
             }
         }
 
-        window.onload = updateLeaderboard;
+        function clearRank(type) {
+            if(!confirm(`確定要清除該榜單首位相關的所有戰績嗎？`)) return;
+            let allRecords = JSON.parse(localStorage.getItem('gym_ko_records') || '[]');
+            
+            // 找出該項目的最高紀錄者
+            let bestVal = 0;
+            if(type === 'weight') bestVal = Math.max(...allRecords.map(r => r.weight));
+            if(type === 'sets') bestVal = Math.max(...allRecords.map(r => r.sets));
+            if(type === 'reps') bestVal = Math.max(...allRecords.map(r => r.reps * r.sets));
+
+            // 過濾掉達到該紀錄的所有資料
+            allRecords = allRecords.filter(r => {
+                if(type === 'weight') return r.weight < bestVal;
+                if(type === 'sets') return r.sets < bestVal;
+                if(type === 'reps') return (r.reps * r.sets) < bestVal;
+                return true;
+            });
+
+            localStorage.setItem('gym_ko_records', JSON.stringify(allRecords));
+            alert("已移除該紀錄持有者的相關數據");
+            updateLeaderboard();
+        }
+
+        function clearAllData() {
+            if(confirm("【終極警告】這將刪除所有玩家的所有歷史戰績，確定執行？")) {
+                localStorage.removeItem('gym_ko_records');
+                updateLeaderboard();
+                showMain();
+            }
+        }
+
+        window.onload = showMain;
     </script>
 </body>
 </html>
