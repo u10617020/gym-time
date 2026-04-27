@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Watch Pro v7</title>
+    <style>
+        :root {
+            --bg-color: #000;
+            --primary-color: #00f2ff;
+            --accent-color: #39ff14;
+            --text-color: #fff;
+        }
+
+        body { background-color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+
+        #watch-frame {
+            width: 320px; height: 320px; background-color: var(--bg-color); border-radius: 50%;
+            border: 8px solid #444; position: relative; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-color);
+        }
+
+        #top-clock { position: absolute; top: 35px; font-size: 0.75rem; color: #888; }
+
+        .screen { display: none; width: 85%; flex-direction: column; gap: 4px; margin-top: 15px; align-items: center; }
+        .screen.active { display: flex; }
+
+        h2 { font-size: 0.9rem; margin: 0; color: var(--primary-color); text-align: center; }
+
+        button {
+            background: #222; color: white; border: 1px solid #444; padding: 6px;
+            border-radius: 20px; cursor: pointer; width: 100%; font-size: 0.8rem;
+        }
+
+        .action-btn { background: var(--primary-color); color: black; font-weight: bold; border: none; padding: 8px; }
+        
+        .scroll-box { max-height: 150px; overflow-y: auto; width: 100%; display: flex; flex-direction: column; gap: 5px; padding: 5px; }
+        .scroll-box::-webkit-scrollbar { width: 0px; }
+
+        .stepper-row { display: flex; align-items: center; justify-content: space-between; width: 90%; background: #111; border-radius: 15px; padding: 2px 8px; }
+        .step-btn { width: 35px; height: 28px; border-radius: 8px; font-weight: bold; }
+        .step-label { font-size: 0.75rem; width: 80px; text-align: center; }
+
+        #timer-display { font-size: 3.5rem; font-weight: bold; color: var(--accent-color); line-height: 1; }
+        
+        .log-item { font-size: 0.7rem; border-bottom: 1px solid #333; width: 100%; display: flex; justify-content: space-between; padding: 4px 0; }
+    </style>
+</head>
+<body>
+
+    <div id="watch-frame">
+        <div id="top-clock">00:00:00</div>
+
+        <div id="step-1" class="screen active">
+            <h2>選擇類型</h2>
+            <button onclick="enterCategory('DUMBBELL')">啞鈴項目</button>
+            <button onclick="enterCategory('MACHINE')">機械器材</button>
+            <button onclick="enterCategory('BARBELL')">槓鈴項目</button>
+        </div>
+
+        <div id="step-1-1" class="screen">
+            <h2>啞鈴動作</h2>
+            <div class="scroll-box">
+                <button onclick="selectExercise('上斜啞鈴臥推')">上斜臥推</button>
+                <button onclick="selectExercise('平板啞鈴臥推')">平板臥推</button>
+                <button onclick="selectExercise('下斜啞鈴推舉')">下斜推舉</button>
+                <button onclick="selectExercise('啞鈴飛鳥')">啞鈴飛鳥</button>
+                <button onclick="selectExercise('窄距胸推')">窄距胸推</button>
+                <button onclick="showScreen(1)" style="color: #888;">← 返回</button>
+            </div>
+        </div>
+
+        <div id="step-2" class="screen">
+            <h2 id="display-ex">動作</h2>
+            <div class="stepper-row">
+                <button class="step-btn" onclick="changeVal('weight', -2)">-</button>
+                <div class="step-label"><span id="val-weight">20</span> kg</div>
+                <button class="step-btn" onclick="changeVal('weight', 2)">+</button>
+            </div>
+            <div class="stepper-row">
+                <button class="step-btn" onclick="changeVal('reps', -1)">-</button>
+                <div class="step-label"><span id="val-reps">10</span> 下</div>
+                <button class="step-btn" onclick="changeVal('reps', 1)">+</button>
+            </div>
+            <div class="stepper-row">
+                <button class="step-btn" onclick="changeVal('rest', -60)">-</button>
+                <div class="step-label">休息 <span id="val-rest">1</span>m</div>
+                <button class="step-btn" onclick="changeVal('rest', 60)">+</button>
+            </div>
+            <button class="action-btn" onclick="startCurrentExercise()">開始訓練</button>
+        </div>
+
+        <div id="step-3" class="screen">
+            <div id="val-sets" style="font-size: 4rem; font-weight: bold; line-height: 1;">1</div>
+            <div style="font-size: 0.8rem; margin-bottom: 5px;">組 (正在進行)</div>
+            <button class="action-btn" onclick="finishOneSet()">完成本組</button>
+            <button style="border:none; background:none; color:#666; font-size:0.7rem; margin-top:5px;" onclick="showAfterExercise()">結束本項</button>
+        </div>
+
+        <div id="step-4" class="screen">
+            <h2 style="color: var(--accent-color)">休息中</h2>
+            <div id="timer-display">01:00</div>
+            <button onclick="skipRest()" style="font-size: 0.7rem; width: 50%;">跳過</button>
+        </div>
+
+        <div id="step-5" class="screen">
+            <h2>此項完成</h2>
+            <div style="font-size: 0.8rem; margin-bottom: 10px;">總計完成 <span id="current-sets-summary" style="color:var(--accent-color)">0</span> 組</div>
+            <button class="action-btn" onclick="showScreen(1)">繼續下一項</button>
+            <button onclick="finalSettlement()" style="margin-top:5px;">結束總結</button>
+        </div>
+
+        <div id="step-6" class="screen">
+            <h2 style="color: gold;">今日統計</h2>
+            <div class="scroll-box" id="history-list"></div>
+            <div style="font-size: 0.7rem; color: #aaa; margin-top: 5px; width: 100%; text-align: center;">
+                總組數: <span id="total-sets-final">0</span> | 耗時: <span id="total-time-final">0</span>
+            </div>
+            <button class="action-btn" onclick="location.reload()" style="margin-top: 5px;">完成</button>
+        </div>
+    </div>
+
+    <script>
+        let sessionData = {
+            startTime: null,
+            history: [],
+            current: { name: '', weight: 20, reps: 10, setsDisplay: 1, actualCompleted: 0, rest: 60 },
+            timer: null
+        };
+
+        function playAlertSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
+        function updateClock() {
+            document.getElementById('top-clock').innerText = new Date().toTimeString().split(' ')[0];
+        }
+        setInterval(updateClock, 1000);
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('step-' + id).classList.add('active');
+        }
+
+        function enterCategory(cat) {
+            if (cat === 'DUMBBELL') showScreen('1-1');
+            else selectExercise(cat === 'MACHINE' ? '機械器材' : '槓鈴器材');
+        }
+
+        function selectExercise(name) {
+            sessionData.current.name = name;
+            sessionData.current.setsDisplay = 1; // 每次選新器材重置為 1
+            sessionData.current.actualCompleted = 0;
+            document.getElementById('display-ex').innerText = name;
+            showScreen(2);
+        }
+
+        function changeVal(key, delta) {
+            if (key === 'rest') {
+                sessionData.current.rest = Math.max(60, sessionData.current.rest + delta);
+                document.getElementById('val-rest').innerText = sessionData.current.rest / 60;
+            } else if (key === 'reps') {
+                sessionData.current.reps = Math.max(1, sessionData.current.reps + delta);
+                document.getElementById('val-reps').innerText = sessionData.current.reps;
+            } else {
+                sessionData.current.weight = Math.max(0, sessionData.current.weight + delta);
+                document.getElementById('val-weight').innerText = sessionData.current.weight;
+            }
+        }
+
+        function startCurrentExercise() {
+            if (!sessionData.startTime) sessionData.startTime = new Date();
+            document.getElementById('val-sets').innerText = sessionData.current.setsDisplay;
+            showScreen(3);
+        }
+
+        function finishOneSet() {
+            sessionData.current.actualCompleted++; // 實際完成組數 +1
+            sessionData.current.setsDisplay++;     // 畫面顯示組數跳到下一組
+            document.getElementById('val-sets').innerText = sessionData.current.setsDisplay;
+            
+            if (navigator.vibrate) navigator.vibrate(100);
+
+            showScreen(4);
+            let timeLeft = sessionData.current.rest;
+            const display = document.getElementById('timer-display');
+            
+            const updateUI = (t) => {
+                let m = Math.floor(t / 60).toString().padStart(2, '0');
+                let s = (t % 60).toString().padStart(2, '0');
+                display.innerText = `${m}:${s}`;
+            };
+
+            updateUI(timeLeft);
+            sessionData.timer = setInterval(() => {
+                timeLeft--;
+                updateUI(timeLeft);
+                if (timeLeft <= 0) {
+                    clearInterval(sessionData.timer);
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    playAlertSound();
+                    showScreen(3);
+                }
+            }, 1000);
+        }
+
+        function skipRest() { clearInterval(sessionData.timer); showScreen(3); }
+
+        function showAfterExercise() {
+            // 儲存實際完成的組數
+            if(sessionData.current.actualCompleted > 0) {
+                sessionData.history.push({
+                    name: sessionData.current.name,
+                    weight: sessionData.current.weight,
+                    reps: sessionData.current.reps,
+                    sets: sessionData.current.actualCompleted
+                });
+            }
+            document.getElementById('current-sets-summary').innerText = sessionData.current.actualCompleted;
+            showScreen(5);
+        }
+
+        function finalSettlement() {
+            const historyBox = document.getElementById('history-list');
+            historyBox.innerHTML = '';
+            let grandTotalSets = 0;
+            
+            sessionData.history.forEach(item => {
+                grandTotalSets += item.sets;
+                const div = document.createElement('div');
+                div.className = 'log-item';
+                div.innerHTML = `<span>${item.name}</span> <span style="color:#aaa">${item.weight}kg x ${item.reps}下 x ${item.sets}組</span>`;
+                historyBox.appendChild(div);
+            });
+
+            const diff = Math.floor((new Date() - sessionData.startTime) / 1000);
+            document.getElementById('total-sets-final').innerText = grandTotalSets;
+            document.getElementById('total-time-final').innerText = `${Math.floor(diff/60)}分${diff%60}秒`;
+            showScreen(6);
+        }
+    </script>
+</body>
+</html>
